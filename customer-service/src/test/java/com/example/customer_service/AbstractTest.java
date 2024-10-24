@@ -1,5 +1,6 @@
 package com.example.customer_service;
 
+import com.example.customer_service.repo.OrderRepo;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
@@ -30,11 +31,13 @@ public class AbstractTest {
                 stmt.executeUpdate();
             }
 
-            // Delete all order history records
+
+                // Delete all order history records
             String deleteOrderHistoryQuery = "DELETE FROM order_history";
             try (PreparedStatement stmt = conn.prepareStatement(deleteOrderHistoryQuery)) {
                 stmt.executeUpdate();
             }
+
         }
     }
 }

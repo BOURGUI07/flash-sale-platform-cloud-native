@@ -14,7 +14,7 @@ services:
 
 
   customer-service:
-    image: "customer-service"
+    image: "customer-service:v1"
     depends_on:
       - app-postgres
     ports:

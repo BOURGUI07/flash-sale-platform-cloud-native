@@ -30,7 +30,7 @@ services:
       - app-network
 
   product-service:
-    image: "product-service"
+    image: "product-service:v1"
     depends_on:
       - app-postgres
     ports:

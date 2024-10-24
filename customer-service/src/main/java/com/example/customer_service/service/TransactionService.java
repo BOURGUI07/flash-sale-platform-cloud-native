@@ -60,7 +60,7 @@ public class TransactionService {
                 .zipWhen(customer -> request
                         .transform(CancelRequestValidator.validate())
                         .flatMap(req ->
-                            orderRepo.findByIdAndCustomerId(customer.getId(), req.orderId())
+                            orderRepo.findByIdAndCustomerId(req.orderId(), customer.getId())
                                     .switchIfEmpty(ApplicationExceptions.orderNotFound(req.orderId()))
                                     .filter(orderHistory -> orderHistory.getOrderStatus().equals(OrderStatus.PENDING))
                                     .switchIfEmpty(ApplicationExceptions.cannotBeCancelled(req.orderId()))

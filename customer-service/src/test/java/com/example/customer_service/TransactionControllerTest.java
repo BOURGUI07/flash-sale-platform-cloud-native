@@ -3,15 +3,19 @@ package com.example.customer_service;
 import com.example.customer_service.domain.OrderStatus;
 import com.example.customer_service.domain.ProductCategory;
 import com.example.customer_service.dto.*;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.transaction.annotation.Transactional;
 import reactor.test.StepVerifier;
+
+import java.sql.SQLException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@Slf4j
 public class TransactionControllerTest extends AbstractTest{
     public WebTestClient.ResponseSpec buy(Integer customerId, PurchaseRequest request, HttpStatus expectedStatus) {
         return client
@@ -42,7 +46,8 @@ public class TransactionControllerTest extends AbstractTest{
     }
 
     @Test
-    void validBuyRequest(){
+    void validBuyRequest() throws SQLException {
+        var orderId = new AtomicInteger();
         var request = PurchaseRequest.builder()
                 .price(100)
                 .productCategory(ProductCategory.ACCESSORIES)
@@ -52,6 +57,7 @@ public class TransactionControllerTest extends AbstractTest{
         buy(3,request,HttpStatus.OK)
                 .returnResult(PurchaseResponse.class)
                 .getResponseBody()
+                .doOnNext(response -> orderId.set(response.orderId()))
                 .as(StepVerifier::create)
                 .assertNext(purchaseResponse -> {
                     assertEquals("ABC",purchaseResponse.productCode());
@@ -61,7 +67,7 @@ public class TransactionControllerTest extends AbstractTest{
                     assertEquals(1000, purchaseResponse.totalPrice());
                     assertEquals(1000, purchaseResponse.balance());
                     assertEquals("Charlie", purchaseResponse.customerName());
-                    assertEquals(2, purchaseResponse.orderId());
+                    assertEquals(orderId.get(), purchaseResponse.orderId());
                     assertEquals(OrderStatus.PENDING, purchaseResponse.orderStatus());
                 })
                 .verifyComplete();
@@ -81,6 +87,54 @@ public class TransactionControllerTest extends AbstractTest{
                     assertEquals("ABC",firstOrder.productCode());
                     assertEquals(OrderStatus.PENDING,firstOrder.status());
 
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    void validCancelRequest() throws SQLException {
+        var orderId = new AtomicInteger();
+        var request = PurchaseRequest.builder()
+                .price(100)
+                .productCategory(ProductCategory.ACCESSORIES)
+                .productCode("ABC")
+                .quantity(10)
+                .build();
+        buy(1,request,HttpStatus.OK)
+                .returnResult(PurchaseResponse.class)
+                .getResponseBody()
+                .doOnNext(responseBody -> {
+                    log.info("RECEIVED PURCHASE RESPONSE: {}", responseBody);
+                    orderId.set(responseBody.orderId());
+                })
+                .as(StepVerifier::create)
+                .assertNext(purchaseResponse -> {
+                    assertEquals("ABC",purchaseResponse.productCode());
+                    assertEquals(100,purchaseResponse.price());
+                    assertEquals(ProductCategory.ACCESSORIES,purchaseResponse.productCategory());
+                    assertEquals(10,purchaseResponse.quantity());
+                    assertEquals(1000, purchaseResponse.totalPrice());
+                    assertEquals(4000, purchaseResponse.balance());
+                    assertEquals("Alice", purchaseResponse.customerName());
+                    //      assertEquals(1, purchaseResponse.orderId());
+                    assertEquals(OrderStatus.PENDING, purchaseResponse.orderStatus());
+                })
+                .verifyComplete();
+
+        var cancelRequest = CancelPurchaseRequest.builder()
+                .orderId(orderId.get())
+                .build();
+
+        cancel(1,cancelRequest,HttpStatus.OK)
+                .returnResult(CancelPurchaseResponse.class)
+                .getResponseBody()
+                .as(StepVerifier::create)
+                .assertNext(cancelResponse -> {
+                    assertEquals(orderId.get(),cancelResponse.orderId());
+                    assertEquals(OrderStatus.CANCELLED,cancelResponse.orderStatus());
+                    assertEquals(5000,cancelResponse.balance());
+                    assertEquals(1,cancelResponse.customerId());
+                    assertEquals("ABC",cancelResponse.productCode());
                 })
                 .verifyComplete();
     }
@@ -277,50 +331,6 @@ public class TransactionControllerTest extends AbstractTest{
                 .verifyComplete();
     }
 
-    /*
-        @Test
-    void validCancelRequest(){
-        var request = PurchaseRequest.builder()
-                .price(100)
-                .productCategory(ProductCategory.ACCESSORIES)
-                .productCode("ABC")
-                .quantity(10)
-                .build();
-        buy(1,request,HttpStatus.OK)
-                .returnResult(PurchaseResponse.class)
-                .getResponseBody()
-                .as(StepVerifier::create)
-                .assertNext(purchaseResponse -> {
-                    assertEquals("ABC",purchaseResponse.productCode());
-                    assertEquals(100,purchaseResponse.price());
-                    assertEquals(ProductCategory.ACCESSORIES,purchaseResponse.productCategory());
-                    assertEquals(10,purchaseResponse.quantity());
-                    assertEquals(1000, purchaseResponse.totalPrice());
-                    assertEquals(4000, purchaseResponse.balance());
-                    assertEquals("Alice", purchaseResponse.customerName());
-              //      assertEquals(1, purchaseResponse.orderId());
-                    assertEquals(OrderStatus.PENDING, purchaseResponse.orderStatus());
-                })
-                .verifyComplete();
-
-        var cancelRequest = CancelPurchaseRequest.builder()
-                .orderId(1)
-                .build();
-
-        cancel(1,cancelRequest,HttpStatus.OK)
-                .returnResult(CancelPurchaseResponse.class)
-                .getResponseBody()
-                .as(StepVerifier::create)
-                .assertNext(cancelResponse -> {
-                    assertEquals(1,cancelResponse.orderId());
-                    assertEquals(OrderStatus.CANCELLED,cancelResponse.orderStatus());
-                    assertEquals(5000,cancelResponse.balance());
-                    assertEquals(1,cancelResponse.customerId());
-                    assertEquals("ABC",cancelResponse.productCode());
-                })
-                .verifyComplete();
-    }
-     */
 
     @Test
     void orderNotFound(){

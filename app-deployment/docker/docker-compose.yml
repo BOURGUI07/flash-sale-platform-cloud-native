@@ -14,7 +14,7 @@ services:
 
 
   customer-service:
-    image: "customer-service:v1"
+    image: "customer-service:v2"
     depends_on:
       - app-postgres
     ports:
@@ -29,6 +29,21 @@ services:
     networks:
       - app-network
 
+  product-service:
+    image: "product-service"
+    depends_on:
+      - app-postgres
+    ports:
+      - 7070:7070
+    deploy:
+      resources:
+        limits:
+          memory: 700m
+    environment:
+      - SPRING_R2DBC_URL=r2dbc:postgresql://app-postgres:5432/product_db
+      - SPRING_FLYWAY_URL=jdbc:postgresql://app-postgres:5432/product_db
+    networks:
+      - app-network
 
 
 

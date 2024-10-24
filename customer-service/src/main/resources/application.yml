@@ -21,3 +21,13 @@ server:
   netty:
     connection-timeout: 2s
     idle-timeout: 15s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: always
+

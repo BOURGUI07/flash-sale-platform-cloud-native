@@ -1,0 +1,37 @@
+services:
+  app-postgres:
+    image: "postgres:14.12"
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+
+
+
+  customer-service:
+    image: "customer-service"
+    depends_on:
+      - app-postgres
+    ports:
+      - 6060:6060
+    deploy:
+      resources:
+        limits:
+          memory: 700m
+    environment:
+      - SPRING_R2DBC_URL=r2dbc:postgresql://app-postgres:5432/customer_db
+      - SPRING_FLYWAY_URL=jdbc:postgresql://app-postgres:5432/customer_db
+    networks:
+      - app-network
+
+
+
+
+networks:
+  app-network:
+    driver: bridge

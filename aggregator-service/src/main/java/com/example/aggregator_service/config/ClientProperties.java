@@ -7,7 +7,8 @@ import java.net.URI;
 @ConfigurationProperties(prefix = "app")
 public record ClientProperties(
         URI customerServiceUri,
-        URI productServiceUri
+        URI productServiceUri,
+        long externalServiceTimeout
 ) {
 
 }

@@ -14,12 +14,15 @@ import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.concurrent.TimeoutException;
 
 @RequiredArgsConstructor
 @Slf4j
 public class ProductServiceClient {
     private final WebClient webClient;
+    private final Duration timeout;
     private Flux<ProductResponse> productResponseFlux;
+
 
     private <T> Mono<T> handleProductNotFoundException(WebClientResponseException.NotFound exception){
         var problemDetail = exception.getResponseBodyAs(ProblemDetail.class);
@@ -53,8 +56,11 @@ public class ProductServiceClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(PurchaseResponse.class)
+                .timeout(timeout,ApplicationExceptions.timeoutExpired("Product Service"))
                 .onErrorResume(WebClientResponseException.NotFound.class, this::handleProductNotFoundException)
-                .onErrorResume(WebClientResponseException.BadRequest.class, this::handleProductRequestBadRequest);
+                .onErrorResume(WebClientResponseException.BadRequest.class, this::handleProductRequestBadRequest)
+                .retryWhen(backOffRetry())
+                .onErrorResume(WebClientResponseException.class, ex->ApplicationExceptions.productException("Get Product Information"));
     }
 
     public Mono<ProductPurchaseProcessResponse> processPurchase(ProductPurchaseProcessRequest request) {
@@ -65,7 +71,8 @@ public class ProductServiceClient {
                 .retrieve()
                 .bodyToMono(ProductPurchaseProcessResponse.class)
                 .onErrorResume(WebClientResponseException.NotFound.class, this::handleProductNotFoundException)
-                .onErrorResume(WebClientResponseException.BadRequest.class, this::handleProductRequestBadRequest);
+                .onErrorResume(WebClientResponseException.BadRequest.class, this::handleProductRequestBadRequest)
+                .onErrorResume(WebClientResponseException.class, ex->ApplicationExceptions.productException("Process Purchase Request"));
     }
 
     public Mono<ProductCancelProcessResponse> processCancel(ProductCancelProcessRequest request) {
@@ -76,7 +83,8 @@ public class ProductServiceClient {
                 .retrieve()
                 .bodyToMono(ProductCancelProcessResponse.class)
                 .onErrorResume(WebClientResponseException.NotFound.class, this::handleProductNotFoundException)
-                .onErrorResume(WebClientResponseException.BadRequest.class, this::handleProductRequestBadRequest);
+                .onErrorResume(WebClientResponseException.BadRequest.class, this::handleProductRequestBadRequest)
+                .onErrorResume(WebClientResponseException.class, ex->ApplicationExceptions.productException("Process Cancel Request"));
     }
 
     public Mono<ProductResponse> createProduct(ProductRequest request) {
@@ -86,7 +94,9 @@ public class ProductServiceClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(ProductResponse.class)
-                .onErrorResume(WebClientResponseException.BadRequest.class, this::handleProductRequestBadRequest);
+                .timeout(timeout,ApplicationExceptions.timeoutExpired("Product Service"))
+                .onErrorResume(WebClientResponseException.BadRequest.class, this::handleProductRequestBadRequest)
+                .onErrorResume(WebClientResponseException.class, ex->ApplicationExceptions.productException("Create Product"));
     }
 
     public Flux<ProductResponse> productResponseFlux(Integer maxPrice) {
@@ -104,12 +114,19 @@ public class ProductServiceClient {
                 .retrieve()
                 .bodyToFlux(ProductResponse.class)
                 .retryWhen(retry())
-                .cache(1);
+                .cache(1)
+                .onErrorResume(WebClientResponseException.class, ex->ApplicationExceptions.productException("Get Product Stream"));
     }
 
     private Retry retry() {
         return Retry.fixedDelay(100, Duration.ofSeconds(1))
                 .doBeforeRetry(rs->log.info("PRODUCT SERVICE PRODUCT STREAM FAILED: {} RETRYING",rs.failure().getMessage()));
+    }
+
+    private Retry backOffRetry(){
+        return Retry.backoff(3, Duration.ofMillis(100))
+                .filter(throwable -> throwable instanceof TimeoutException);
+        // 3 attempts are allowed, 100 ms as initial backoff.
     }
 
 

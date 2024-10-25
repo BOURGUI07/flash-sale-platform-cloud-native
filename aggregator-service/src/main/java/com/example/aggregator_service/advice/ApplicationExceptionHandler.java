@@ -14,6 +14,21 @@ public class ApplicationExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(CustomerServiceException.class)
+    public ProblemDetail handleCustomerServiceException(CustomerServiceException ex) {
+        return handleException(ex, HttpStatus.INTERNAL_SERVER_ERROR, "Customer Service Exception");
+    }
+
+    @ExceptionHandler(ProductServiceException.class)
+    public ProblemDetail handleProductServiceException(ProductServiceException ex) {
+        return handleException(ex, HttpStatus.INTERNAL_SERVER_ERROR, "Product Service Exception");
+    }
+
+    @ExceptionHandler(ExternalServiceTimeoutException.class)
+    public ProblemDetail handleTimoutException(ExternalServiceTimeoutException ex) {
+        return handleException(ex, HttpStatus.GATEWAY_TIMEOUT, "Timeout Expired");
+    }
+
     @ExceptionHandler(ProductNotFoundException.class)
     public ProblemDetail handleProductNotFound(ProductNotFoundException ex) {
         return handleException(ex, HttpStatus.NOT_FOUND, "Product Not Found");

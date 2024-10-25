@@ -3,6 +3,18 @@ package com.example.aggregator_service.exceptions;
 import reactor.core.publisher.Mono;
 
 public class ApplicationExceptions {
+    public static <T> Mono<T> customerException(String failedOperation) {
+        return Mono.error(new CustomerServiceException(failedOperation));
+    }
+
+    public static <T> Mono<T> productException(String failedOperation) {
+        return Mono.error(new ProductServiceException(failedOperation));
+    }
+
+    public static <T> Mono<T> timeoutExpired(String serviceName) {
+        return Mono.error(new ExternalServiceTimeoutException(serviceName));
+    }
+
     public static <T> Mono<T> customerNotFound(String message) {
         return Mono.error(new CustomerNotFoundException(message));
     }

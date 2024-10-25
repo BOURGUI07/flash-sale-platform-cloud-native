@@ -46,6 +46,25 @@ services:
       - app-network
 
 
+  aggregator-service:
+    image: "aggregator-service"
+    depends_on:
+      - product-service
+      - customer-service
+    ports:
+      - 8080:8080
+    deploy:
+      resources:
+        limits:
+          memory: 700m
+    environment:
+      - APP_CUSTOMER_SERVICE_URI=http://customer-service:6060
+      - APP_PRODUCT_SERVICE_URI=http://product-service:7070
+      - APP_EXTERNAL_SERVICE_TIMEOUT=3
+    networks:
+      - app-network
+
+
 
 
 

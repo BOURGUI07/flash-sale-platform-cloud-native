@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
+
 @Configuration
 public class ServiceClientConfig {
     private WebClient createWebClient(String baseUrl) {
@@ -16,13 +18,19 @@ public class ServiceClientConfig {
     @Bean
     public CustomerServiceClient customerServiceClient(
             ClientProperties clientProperties){
-        return new CustomerServiceClient(createWebClient(clientProperties.customerServiceUri().toString()));
+        return new CustomerServiceClient(
+                createWebClient(clientProperties.customerServiceUri().toString()),
+                Duration.ofSeconds(clientProperties.externalServiceTimeout())
+        );
     }
 
     @Bean
     public ProductServiceClient productServiceClient(
             ClientProperties clientProperties){
-        return new ProductServiceClient(createWebClient(clientProperties.productServiceUri().toString()));
+        return new ProductServiceClient(
+                createWebClient(clientProperties.productServiceUri().toString()),
+                Duration.ofSeconds(clientProperties.externalServiceTimeout())
+        );
     }
 
 

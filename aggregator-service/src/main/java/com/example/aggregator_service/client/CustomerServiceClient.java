@@ -1,5 +1,6 @@
 package com.example.aggregator_service.client;
 
+import com.example.aggregator_service.config.ClientProperties;
 import com.example.aggregator_service.dto.*;
 import com.example.aggregator_service.exceptions.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
@@ -8,11 +9,16 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
+
+import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 
 @RequiredArgsConstructor
 @Slf4j
 public class CustomerServiceClient {
     private final WebClient webClient;
+    private final Duration timeout;
 
 
     public Mono<CustomerInformation> getCustomerInformation(Integer customerId) {
@@ -21,7 +27,10 @@ public class CustomerServiceClient {
                 .uri("/customers/{customerId}",customerId)
                 .retrieve()
                 .bodyToMono(CustomerInformation.class)
-                .onErrorResume(WebClientResponseException.NotFound.class,this::handleNotFoundException);
+                .timeout(timeout,ApplicationExceptions.timeoutExpired("Customer Service"))
+                .onErrorResume(WebClientResponseException.NotFound.class,this::handleNotFoundException)
+                .retryWhen(backOffRetry())
+                .onErrorResume(WebClientResponseException.InternalServerError.class, ex->ApplicationExceptions.customerException("Get Customer Information"));
     }
 
     private <T> Mono<T> handleNotFoundException(WebClientResponseException.NotFound exception){
@@ -45,7 +54,9 @@ public class CustomerServiceClient {
                 .bodyValue(customerRequest)
                 .retrieve()
                 .bodyToMono(CustomerResponse.class)
-                .onErrorResume(WebClientResponseException.BadRequest.class,this::handleCustomerRequestBadRequest);
+                .timeout(timeout,ApplicationExceptions.timeoutExpired("Customer Service"))
+                .onErrorResume(WebClientResponseException.BadRequest.class,this::handleCustomerRequestBadRequest)
+                .onErrorResume(WebClientResponseException.class, ex->ApplicationExceptions.customerException("Create Customer"));
     }
 
     private <T> Mono<T> handleCustomerRequestBadRequest(WebClientResponseException.BadRequest exception){
@@ -73,7 +84,9 @@ public class CustomerServiceClient {
                 .uri("/customers/{customerId}",customerId)
                 .retrieve()
                 .bodyToMono(Void.class)
-                .onErrorResume(WebClientResponseException.NotFound.class,this::handleNotFoundException);
+                .timeout(timeout,ApplicationExceptions.timeoutExpired("Customer Service"))
+                .onErrorResume(WebClientResponseException.NotFound.class,this::handleNotFoundException)
+                .onErrorResume(WebClientResponseException.class, ex->ApplicationExceptions.customerException("Delete Customer"));
     }
 
     public Mono<CustomerPurchaseResponse> buy(Integer customerId, CustomerPurchaseRequest request){
@@ -83,8 +96,10 @@ public class CustomerServiceClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(CustomerPurchaseResponse.class)
+                .timeout(timeout,ApplicationExceptions.timeoutExpired("Customer Service"))
                 .onErrorResume(WebClientResponseException.NotFound.class,this::handleNotFoundException)
-                .onErrorResume(WebClientResponseException.BadRequest.class,this::handleCustomerRequestBadRequest);
+                .onErrorResume(WebClientResponseException.BadRequest.class,this::handleCustomerRequestBadRequest)
+                .onErrorResume(WebClientResponseException.class, ex->ApplicationExceptions.customerException("Buy Product"));
     }
 
     public Mono<CancelPurchaseResponse> cancel(Integer customerId, CancelPurchaseRequest request){
@@ -94,11 +109,17 @@ public class CustomerServiceClient {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(CancelPurchaseResponse.class)
+                .timeout(timeout,ApplicationExceptions.timeoutExpired("Customer Service"))
                 .onErrorResume(WebClientResponseException.NotFound.class,this::handleNotFoundException)
-                .onErrorResume(WebClientResponseException.BadRequest.class,this::handleCustomerRequestBadRequest);
+                .onErrorResume(WebClientResponseException.BadRequest.class,this::handleCustomerRequestBadRequest)
+                .onErrorResume(WebClientResponseException.class, ex->ApplicationExceptions.customerException("Cancel Purchase Request"));
     }
 
-
+    private Retry backOffRetry(){
+        return Retry.backoff(3, Duration.ofMillis(100))
+                .filter(throwable -> throwable instanceof TimeoutException);
+        // 3 attempts are allowed, 100 ms as initial backoff.
+    }
 
 
 }

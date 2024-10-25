@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: aggregator-service
+  lifecycle:
+    timeout-per-shutdown-phase: 15s
+server:
+  port: 8080
+  shutdown: graceful
+  netty:
+    connection-timeout: 2s
+    idle-timeout: 15s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: always
+
+
+app:
+  customer-service-uri: "http://localhost:6060"
+  product-service-uri: "http://localhost:7070"

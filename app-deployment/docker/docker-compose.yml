@@ -10,13 +10,32 @@ services:
       - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-
+  config-service:
+    image: "config-service"
+    ports:
+      - 8888:8888
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
 
   customer-service:
-    image: "customer-service:v2"
+    image: "customer-service:v3"
     depends_on:
-      - app-postgres
+      app-postgres:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
     ports:
       - 6060:6060
     deploy:
@@ -26,13 +45,23 @@ services:
     environment:
       - SPRING_R2DBC_URL=r2dbc:postgresql://app-postgres:5432/customer_db
       - SPRING_FLYWAY_URL=jdbc:postgresql://app-postgres:5432/customer_db
+      - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6060/actuator/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
 
   product-service:
-    image: "product-service:v1"
+    image: "product-service:v2"
     depends_on:
-      - app-postgres
+      app-postgres:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
     ports:
       - 7070:7070
     deploy:
@@ -42,15 +71,25 @@ services:
     environment:
       - SPRING_R2DBC_URL=r2dbc:postgresql://app-postgres:5432/product_db
       - SPRING_FLYWAY_URL=jdbc:postgresql://app-postgres:5432/product_db
+      - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
     networks:
       - app-network
-
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7070/actuator/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
 
   aggregator-service:
-    image: "aggregator-service"
+    image: "aggregator-service:v1"
     depends_on:
-      - product-service
-      - customer-service
+      customer-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
     ports:
       - 8080:8080
     deploy:
@@ -60,13 +99,15 @@ services:
     environment:
       - APP_CUSTOMER_SERVICE_URI=http://customer-service:6060
       - APP_PRODUCT_SERVICE_URI=http://product-service:7070
-      - APP_EXTERNAL_SERVICE_TIMEOUT=3
+      - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
     networks:
       - app-network
-
-
-
-
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
 
 networks:
   app-network:

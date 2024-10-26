@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/properties")
 public class PropertiesController {
     private final AppProperties appProperties;
 

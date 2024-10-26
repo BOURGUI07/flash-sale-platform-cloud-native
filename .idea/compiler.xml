@@ -9,6 +9,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="product-service" />
         <module name="config-service" />
+        <module name="edge-service" />
         <module name="customer-service" />
         <module name="aggregator-service" />
       </profile>
@@ -19,6 +20,7 @@
       <module name="aggregator-service" options="-parameters" />
       <module name="config-service" options="-parameters" />
       <module name="customer-service" options="-parameters" />
+      <module name="edge-service" options="-parameters" />
       <module name="product-service" options="-parameters" />
     </option>
   </component>

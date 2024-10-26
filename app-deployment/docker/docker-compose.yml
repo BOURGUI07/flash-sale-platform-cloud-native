@@ -16,6 +16,19 @@ services:
       timeout: 5s
       retries: 5
 
+  app-redis:
+    image: "redis:7.0"
+    container_name: "app-redis"
+    ports:
+      - 6379:6379
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   config-service:
     image: "config-service"
     ports:
@@ -30,7 +43,7 @@ services:
       start_period: 15s
 
   customer-service:
-    image: "customer-service:v3"
+    image: "customer-service:v4"
     depends_on:
       app-postgres:
         condition: service_healthy
@@ -56,7 +69,7 @@ services:
       start_period: 15s
 
   product-service:
-    image: "product-service:v2"
+    image: "product-service:v3"
     depends_on:
       app-postgres:
         condition: service_healthy
@@ -82,13 +95,11 @@ services:
       start_period: 15s
 
   aggregator-service:
-    image: "aggregator-service:v1"
+    image: "aggregator-service:v2"
     depends_on:
       customer-service:
         condition: service_healthy
       product-service:
-        condition: service_healthy
-      config-service:
         condition: service_healthy
     ports:
       - 8080:8080
@@ -104,6 +115,34 @@ services:
       - app-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
+
+  edge-service:
+    image: "edge-service:v2"
+    depends_on:
+      app-redis:
+        condition: service_healthy
+      aggregator-service:
+        condition: service_healthy
+    ports:
+      - 9000:9000
+    deploy:
+      resources:
+        limits:
+          memory: 700m
+    environment:
+      - AGGREGATOR_SERVICE_URL=http://aggregator-service:8080
+      - CUSTOMER_SERVICE_URL=http://customer-service:6060
+      - PRODUCT_SERVICE_URL=http://product-service:7070
+      - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
+      - SPRING_DATA_REDIS_HOST=app-redis
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/actuator/health" ]
       interval: 10s
       timeout: 2s
       retries: 5

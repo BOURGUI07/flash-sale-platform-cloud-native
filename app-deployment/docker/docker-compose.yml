@@ -35,6 +35,7 @@ services:
     depends_on:
       - loki
       - prometheus
+      - tempo
     ports:
       - "3000:3000"
     environment:
@@ -88,14 +89,32 @@ services:
       - app-network
 
 
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: tempo
+    command: -config.file=/etc/tempo-config.yml
+    ports:
+      - "3110:3100"     # Tempo
+      - "4317:4317"     # OTel
+    volumes:
+      - ./observability/tempo/tempo.yml:/etc/tempo-config.yml
+    networks:
+      - app-network
+
+
 
 
   config-service:
-    image: "config-service:v1"
+    image: "config-service:v8"
     depends_on:
       - fluent-bit
     ports:
       - 8888:8888
+    environment:
+      - JAVA_TOOL_OPTIONS=-javaagent:/app/opentelemetry-javaagent.jar
+      - OTEL_SERVICE_NAME=config-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+      - OTEL_METRICS_EXPORTER=none
     networks:
       - app-network
     restart: on-failure
@@ -105,7 +124,7 @@ services:
         fluentd-address: 127.0.0.1:24224
 
   customer-service:
-    image: "customer-service:v6"
+    image: "customer-service:v7"
     depends_on:
       - fluent-bit
       - app-postgres
@@ -121,6 +140,10 @@ services:
       - SPRING_R2DBC_URL=r2dbc:postgresql://app-postgres:5432/customer_db
       - SPRING_FLYWAY_URL=jdbc:postgresql://app-postgres:5432/customer_db
       - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
+      - JAVA_TOOL_OPTIONS=-javaagent:/app/opentelemetry-javaagent.jar
+      - OTEL_SERVICE_NAME=config-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+      - OTEL_METRICS_EXPORTER=none
     networks:
       - app-network
     logging:
@@ -129,7 +152,7 @@ services:
         fluentd-address: 127.0.0.1:24224
 
   product-service:
-    image: "product-service:v5"
+    image: "product-service:v7"
     depends_on:
       - fluent-bit
       - app-postgres
@@ -144,6 +167,10 @@ services:
       - SPRING_R2DBC_URL=r2dbc:postgresql://app-postgres:5432/product_db
       - SPRING_FLYWAY_URL=jdbc:postgresql://app-postgres:5432/product_db
       - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
+      - JAVA_TOOL_OPTIONS=-javaagent:/app/opentelemetry-javaagent.jar
+      - OTEL_SERVICE_NAME=config-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+      - OTEL_METRICS_EXPORTER=none
     networks:
       - app-network
     restart: on-failure
@@ -153,7 +180,7 @@ services:
         fluentd-address: 127.0.0.1:24224
 
   aggregator-service:
-    image: "aggregator-service:v4"
+    image: "aggregator-service:v7"
     depends_on:
       - fluent-bit
       - customer-service
@@ -169,6 +196,10 @@ services:
       - APP_CUSTOMER_SERVICE_URI=http://customer-service:6060
       - APP_PRODUCT_SERVICE_URI=http://product-service:7070
       - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
+      - JAVA_TOOL_OPTIONS=-javaagent:/app/opentelemetry-javaagent.jar
+      - OTEL_SERVICE_NAME=config-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+      - OTEL_METRICS_EXPORTER=none
     networks:
       - app-network
     logging:
@@ -177,7 +208,7 @@ services:
         fluentd-address: 127.0.0.1:24224
 
   edge-service:
-    image: "edge-service:v4"
+    image: "edge-service:v7"
     depends_on:
       - fluent-bit
       - app-redis
@@ -195,6 +226,10 @@ services:
       - PRODUCT_SERVICE_URL=http://product-service:7070
       - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
       - SPRING_DATA_REDIS_HOST=app-redis
+      - JAVA_TOOL_OPTIONS=-javaagent:/app/opentelemetry-javaagent.jar
+      - OTEL_SERVICE_NAME=config-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
+      - OTEL_METRICS_EXPORTER=none
     networks:
       - app-network
     logging:

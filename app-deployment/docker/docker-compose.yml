@@ -29,28 +29,90 @@ services:
       timeout: 5s
       retries: 5
 
+  grafana:
+    image: grafana/grafana-oss:10.4.3
+    container_name: grafana
+    depends_on:
+      - loki
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=user
+      - GF_SECURITY_ADMIN_PASSWORD=password
+    volumes:
+      - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./observability/grafana/grafana.ini:/etc/grafana/grafana.ini
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: loki
+    depends_on:
+      - fluent-bit
+    ports:
+      - "3100:3100"
+    networks:
+      - app-network
+
+  fluent-bit:
+      image: grafana/fluent-bit-plugin-loki:2.9.8
+      container_name: fluent-bit
+      ports:
+        - "24224:24224"
+        - "2020:2020"    # For HTTP health check and metrics
+      environment:
+        - LOKI_URL=http://loki:3100/loki/api/v1/push
+      volumes:
+        - ./observability/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      networks:
+        - app-network
+      restart: always
+
+  prometheus:
+    image: quay.io/prometheus/prometheus:v2.52.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - app-network
+
+
+
+
   config-service:
-    image: "config-service"
+    image: "config-service:v1"
+    depends_on:
+      - fluent-bit
     ports:
       - 8888:8888
     networks:
       - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
-      interval: 10s
-      timeout: 2s
-      retries: 5
-      start_period: 15s
+    restart: on-failure
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
 
   customer-service:
-    image: "customer-service:v4"
+    image: "customer-service:v6"
     depends_on:
-      app-postgres:
-        condition: service_healthy
-      config-service:
-        condition: service_healthy
+      - fluent-bit
+      - app-postgres
+      - config-service
     ports:
       - 6060:6060
+    restart: on-failure
     deploy:
       resources:
         limits:
@@ -61,20 +123,17 @@ services:
       - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
     networks:
       - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6060/actuator/health"]
-      interval: 10s
-      timeout: 2s
-      retries: 5
-      start_period: 15s
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
 
   product-service:
-    image: "product-service:v3"
+    image: "product-service:v5"
     depends_on:
-      app-postgres:
-        condition: service_healthy
-      config-service:
-        condition: service_healthy
+      - fluent-bit
+      - app-postgres
+      - config-service
     ports:
       - 7070:7070
     deploy:
@@ -87,22 +146,21 @@ services:
       - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
     networks:
       - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7070/actuator/health"]
-      interval: 10s
-      timeout: 2s
-      retries: 5
-      start_period: 15s
+    restart: on-failure
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
 
   aggregator-service:
-    image: "aggregator-service:v2"
+    image: "aggregator-service:v4"
     depends_on:
-      customer-service:
-        condition: service_healthy
-      product-service:
-        condition: service_healthy
+      - fluent-bit
+      - customer-service
+      - product-service
     ports:
       - 8080:8080
+    restart: on-failure
     deploy:
       resources:
         limits:
@@ -113,22 +171,20 @@ services:
       - SPRING_CLOUD_CONFIG_URI=http://config-service:8888
     networks:
       - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 10s
-      timeout: 2s
-      retries: 5
-      start_period: 15s
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
 
   edge-service:
-    image: "edge-service:v2"
+    image: "edge-service:v4"
     depends_on:
-      app-redis:
-        condition: service_healthy
-      aggregator-service:
-        condition: service_healthy
+      - fluent-bit
+      - app-redis
+      - aggregator-service
     ports:
       - 9000:9000
+    restart: on-failure
     deploy:
       resources:
         limits:
@@ -141,12 +197,10 @@ services:
       - SPRING_DATA_REDIS_HOST=app-redis
     networks:
       - app-network
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/actuator/health" ]
-      interval: 10s
-      timeout: 2s
-      retries: 5
-      start_period: 15s
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
 
 networks:
   app-network:

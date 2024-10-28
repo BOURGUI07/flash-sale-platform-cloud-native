@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-service
+  labels:
+    app: edge-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edge-service
+  template:
+    metadata:
+      labels:
+        app: edge-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "9000"
+    spec:
+      containers:
+        - name: edge-service
+          image: edge-service:v4
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command: [ "sh", "-c", "sleep 5" ]
+          ports:
+            - containerPort: 9000
+          env:
+            - name: APP_CUSTOMER_SERVICE_URI
+              value: http://customer-service
+            - name: APP_PRODUCT_SERVICE_URI
+              value: http://product-service
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: http://config-service
+            - name: APP_AGGREGATOR_SERVICE_URI
+              value: http://aggregator-service
+            - name: SPRING_DATA_REDIS_HOST
+              value: app-redis

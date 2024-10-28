@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: customer-service
+  labels:
+    app: customer-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: customer-service
+  template:
+    metadata:
+      labels:
+        app: customer-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "6060"
+    spec:
+      containers:
+        - name: customer-service
+          image: customer-service:v6
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command: [ "sh", "-c", "sleep 5" ]
+          ports:
+            - containerPort: 6060
+          env:
+            - name: SPRING_R2DBC_URL
+              value: r2dbc:postgresql://app-postgres/customer_db
+            - name: SPRING_FLYWAY_URL
+              value: jdbc:postgresql://app-postgres/customer_db
+            - name: SPRING_CLOUD_CONFIG_URI
+              value: http://config-service

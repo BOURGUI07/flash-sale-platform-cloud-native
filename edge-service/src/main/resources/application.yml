@@ -68,6 +68,8 @@ spring:
           type: elastic
           max-idle-time: 15s
           max-life-time: 60s
+          metrics: true
+        wiretap: true
       default-filters:
         - SaveSession
         - name: Retry
@@ -115,7 +117,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, refresh, metrics, prometheus
+        include: health, info, refresh, metrics, prometheus, circuitbreakers
   endpoint:
     health:
       show-details: always

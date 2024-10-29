@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: edge-service
-          image: edge-service:v4
+          image: edge-service:v5
           imagePullPolicy: IfNotPresent
           lifecycle:
             preStop:
@@ -39,3 +39,9 @@ spec:
               value: http://aggregator-service
             - name: SPRING_DATA_REDIS_HOST
               value: app-redis
+            - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_GATEWAY
+              value: "DEBUG"
+            - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB_REACTIVE
+              value: "DEBUG"
+            - name: LOGGING_LEVEL_REACTOR_NETTY
+              value: "DEBUG"

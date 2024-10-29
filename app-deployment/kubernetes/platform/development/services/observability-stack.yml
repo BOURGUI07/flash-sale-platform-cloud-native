@@ -47,18 +47,7 @@ spec:
           volumeMounts:
             - name: grafana-datasources
               mountPath: /etc/grafana/provisioning/datasources
-          livenessProbe:
-            httpGet:
-              path: /api/health
-              port: 3000
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 3000
-            initialDelaySeconds: 30
-            periodSeconds: 10
+
       volumes:
         - name: grafana-datasources
           configMap:
